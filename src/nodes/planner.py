@@ -33,16 +33,23 @@ class Planner:
         self.map = json.loads(msg.data)
 
         # TODO BEGIN MRSS: Use map for planning
-
+        goal = np.array(self.map[list(self.map.keys())[0]])
         # END MRSS
 
         # Twist
         self.cmd = geometry_msgs.msg.Twist()
 
         # TODO BEGIN MRSS: Update the current command
-        self.cmd.linear.x = 0.
-        self.cmd.linear.y = 0.
-        self.cmd.angular.z = 0.
+        n_goal = np.linalg.norm(goal)
+        if n_goal < 0.1: 
+            self.cmd.linear.x = 0.
+            self.cmd.linear.y = 0.
+            self.cmd.angular.z = 0.
+        else:
+            self.cmd.linear.x = goal[0]/n_goal * 0.15
+            self.cmd.linear.y = goal[1]/n_goal * 0.15
+            self.cmd.angular.z = 0.
+
         # END MRSS
 
     def spin(self):
