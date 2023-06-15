@@ -2,6 +2,7 @@
 # Reads the map output (see map_broadcaster.py) and publishes twist commands to reach the goal
 
 import numpy as np
+from potential_field_planner import PotentialFieldPlanner
 import rospy
 from std_msgs.msg import String
 import geometry_msgs.msg
@@ -25,15 +26,30 @@ class Planner:
         self.cmd = None
         self.rate = rospy.Rate(10)  # Publisher frequency
 
-        # TODO BEGIN MRSS: Add attributes (If needed)
-
+       # set the planner attributes
+        self.time_step = 0.001
+        self.k_att     = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 0.5]])
+        self.k_rep     = 1
+        self.vel_max   = 0.5
+        self.planner = None
         # END MRSS
 
     def map_callback(self, msg):
         self.map = json.loads(msg.data)
 
         # TODO BEGIN MRSS: Use map for planning
-        goal = np.array(self.map[list(self.map.keys())[0]])
+        goal = self.map[list(self.map.keys())[-1]]
+        goal_pos = np.array(goal['trans'])
+        obs_1 = self.map[list(self.map.keys())[-4]]
+        obs_1_pos = np.array(obs_1['trans'])
+        robot = self.map[list(self.map.keys())[0]]
+        robot_pos = self.map[list(self.map.keys())[0]]['trans']
+
+
+        if self.planner is not None and goal_pos != prev_goal_pos:
+            self.planner   = PotentialFieldPlanner(goal_pos, 1/self.rate, self.k_att, self.k_rep, self.vel_max)
+            self.planner.set_obstacle_distance(1.5)
+            self.planner.set_obstacle_position(obs_1_pos)
         # END MRSS
 
         # Twist
@@ -46,10 +62,15 @@ class Planner:
             self.cmd.linear.y = 0.
             self.cmd.angular.z = 0.
         else:
-            self.cmd.linear.x = goal[0]/n_goal * 0.15
-            self.cmd.linear.y = goal[1]/n_goal * 0.15
+            # self.cmd.linear.x = goal[0]/n_goal * 0.15
+            # self.cmd.linear.y = goal[1]/n_goal * 0.15
+            # self.cmd.angular.z = 0.
+            pos_des, lin_vel =	self.planner.get_avoidance_force(robot_pos)
+            self.cmd.linear.x = lin_vel[0] * 0.15
+            self.cmd.linear.y = lin_vel[1] * 0.15
             self.cmd.angular.z = 0.
-
+            
+        prev_goal_pos = goal_pos
         # END MRSS
 
     def spin(self):
